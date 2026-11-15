@@ -1,0 +1,34 @@
+name: Manus automation for labeled issues
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  forward-to-manus:
+    name: Forward automation-labeled issue to Manus
+    if: github.event.label.name == 'automation'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Send event to Manus webhook
+        env:
+          MANUS_WEBHOOK_URL: ${{ secrets.MANUS_WEBHOOK_URL }}
+          EVENT_JSON: ${{ toJson(github.event) }}
+        run: |
+          set -euo pipefail
+          if [ -z "${MANUS_WEBHOOK_URL:-}" ]; then
+            echo "::error::MANUS_WEBHOOK_URL repository secret is not configured."
+            exit 1
+          fi
+          printf '%s' "$EVENT_JSON" \
+            | curl --fail-with-body --silent --show-error \
+                --request POST \
+                --header 'Content-Type: application/json' \
+                --header 'User-Agent: github-actions-manus-automation' \
+                --data-binary @- \
+                "$MANUS_WEBHOOK_URL"
